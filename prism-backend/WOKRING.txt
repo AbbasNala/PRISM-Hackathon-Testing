@@ -1,0 +1,80 @@
+.\venv\Scripts\Activate.ps1
+
+python app.py
+
+second terminal:-
+To check if works:- Invoke-RestMethod -Uri http://127.0.0.1:5000/api/health
+
+Creating conversation:-
+$conversation = Invoke-RestMethod `
+  -Uri http://127.0.0.1:5000/api/conversation/start `
+  -Method POST
+
+$conversation
+(It should return a unique session_id. Keep this PowerShell window open so you can reuse $conversation in the following steps)
+
+
+Test-message:-
+$body = @{
+    session_id = $conversation.session_id
+    speaker = "other"
+    text = "Would you like something to drink?"
+} | ConvertTo-Json
+
+Invoke-RestMethod `
+  -Uri http://127.0.0.1:5000/api/conversation/message `
+  -Method POST `
+  -ContentType "application/json" `
+  -Body $body
+
+
+Test-suggestion(predict):-
+$body = @{
+    session_id = $conversation.session_id
+    recognized_signs = @("I", "WANT")
+} | ConvertTo-Json
+
+Invoke-RestMethod `
+  -Uri http://127.0.0.1:5000/api/suggest `
+  -Method POST `
+  -ContentType "application/json" `
+  -Body $body
+
+
+
+View history of convo:-
+
+	# 1. Generate contextual suggestions
+$body = @{
+    session_id = $conversation.session_id
+    recognized_signs = @("I", "WANT")
+} | ConvertTo-Json
+
+$suggestions = Invoke-RestMethod `
+  -Uri http://127.0.0.1:5000/api/suggest `
+  -Method POST `
+  -ContentType "application/json" `
+  -Body $body
+
+Write-Host "`n=== SUGGESTIONS ===" -ForegroundColor Cyan
+$suggestions.suggestions
+
+# 2. Confirm a suggested message
+$body = @{
+    session_id = $conversation.session_id
+    confirmed_message = "I want water"
+} | ConvertTo-Json
+
+Invoke-RestMethod `
+  -Uri http://127.0.0.1:5000/api/confirm `
+  -Method POST `
+  -ContentType "application/json" `
+  -Body $body
+
+# 3. Display the final conversation history
+Write-Host "`n=== FINAL CONVERSATION HISTORY ===" -ForegroundColor Yellow
+
+$history = Invoke-RestMethod `
+  -Uri "http://127.0.0.1:5000/api/conversation/history/$($conversation.session_id)"
+
+$history.history | Format-Table speaker, text -AutoSize
